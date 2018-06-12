@@ -71,6 +71,50 @@ fi
 done
 done < "./Target_table.csv"
 
+dbname=""
+username="postgres"
+PASS=postgres
+while IFS=',' read -r line; 
+do
+IFS=',' read -r -a array <<< "$line"
+length="${#array[@]}"
+targettableoriginal=${array[0]}
+targettable=$(echo ${array[0]} | sed -e "s/table_//g")
+read -r -a fromtables <<< $(ls *.sql)
+fromTablelength=${#fromtables[@]}
+
+for fromfile in ${fromtables[@]}
+do
+if [[ $fromfile = *"$targettable"* ]]
+then
+fromtable=$fromfile
+fromtable=$(echo $fromtable | sed -e "s/.sql//g")
+sqlQuery=""
+for ((i=1; i< $length; i++))
+do
+column=$(echo ${array[$i]} | sed 's/\"//g')
+if [[ "$column" =~ [0-9] ]]
+then
+column=\""$column"\"
+fi
+if [ $i == 1 ]
+then
+sqlQuery+=" $column"
+else
+sqlQuery+=", $column"
+fi
+sqlQuery=$(echo $sqlQuery | sed 's/, ,//g' | sed 's/,,//g')
+
+done 
+query="INSERT INTO $targettableoriginal ($sqlQuery) SELECT $sqlQuery FROM  $fromtable;"
+echo $query
+PGPASSWORD=$PASS psql -U $username -d $dbname<< EOF
+$query
+EOF
+break
+fi
+done
+done < "./Target_table.csv"
 
 
 
